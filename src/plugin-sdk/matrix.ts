@@ -115,6 +115,7 @@ export {
   sanitizeMatrixPathSegment,
 } from "../infra/matrix-storage-paths.js";
 export { fetchWithSsrFGuard } from "../infra/net/fetch-guard.js";
+export { isPrivateOrLoopbackHost } from "../gateway/net.js";
 export {
   getSessionBindingService,
   registerSessionBindingAdapter,
@@ -134,6 +135,7 @@ export { normalizePollInput } from "../polls.js";
 export {
   DEFAULT_ACCOUNT_ID,
   normalizeAccountId,
+  normalizeOptionalAccountId,
   resolveAgentIdFromSessionKey,
 } from "../routing/session-key.js";
 export type { RuntimeEnv } from "../runtime.js";
