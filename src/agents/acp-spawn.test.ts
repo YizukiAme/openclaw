@@ -452,7 +452,7 @@ describe("spawnAcpDirect", () => {
       .map((call: unknown[]) => call[0] as { method?: string; params?: Record<string, unknown> })
       .find((request) => request.method === "agent");
     expect(agentCall?.params?.channel).toBe("matrix");
-    expect(agentCall?.params?.to).toBe("room:child-thread");
+    expect(agentCall?.params?.to).toBe("room:!room:example");
     expect(agentCall?.params?.threadId).toBe("child-thread");
   });
 

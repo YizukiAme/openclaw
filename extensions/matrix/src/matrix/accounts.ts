@@ -2,8 +2,8 @@ import {
   DEFAULT_ACCOUNT_ID,
   hasConfiguredSecretInput,
   normalizeAccountId,
-  resolveMatrixDefaultOrOnlyAccountId,
 } from "openclaw/plugin-sdk/matrix";
+import { resolveMatrixDefaultOrOnlyAccountId } from "../account-selection.js";
 import type { CoreConfig, MatrixConfig } from "../types.js";
 import {
   findMatrixAccountConfig,

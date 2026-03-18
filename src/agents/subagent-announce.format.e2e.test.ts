@@ -897,7 +897,8 @@ describe("subagent announce formatting", () => {
     expect(agentSpy).toHaveBeenCalledTimes(1);
     const call = agentSpy.mock.calls[0]?.[0] as { params?: Record<string, unknown> };
     expect(call?.params?.channel).toBe("matrix");
-    expect(call?.params?.to).toBe("room:$thread-bound-1");
+    expect(call?.params?.to).toBe("room:!room:example");
+    expect(call?.params?.threadId).toBe("$thread-bound-1");
   });
 
   it("includes completion status details for error and timeout outcomes", async () => {

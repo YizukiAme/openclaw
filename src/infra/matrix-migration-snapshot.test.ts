@@ -1,9 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { resolveMatrixAccountStorageRoot } from "../../extensions/matrix/runtime-api.js";
 import { withTempHome } from "../../test/helpers/temp-home.js";
 import { detectLegacyMatrixCrypto } from "./matrix-legacy-crypto.js";
-import { resolveMatrixAccountStorageRoot } from "./matrix-storage-paths.js";
 
 const createBackupArchiveMock = vi.hoisted(() => vi.fn());
 

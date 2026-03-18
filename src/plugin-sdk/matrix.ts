@@ -106,12 +106,12 @@ export {
   resolveMatrixCredentialsDir,
   resolveMatrixCredentialsPath,
   resolveMatrixLegacyFlatStoragePaths,
-} from "../infra/matrix-storage-paths.js";
-export { getMatrixScopedEnvVarNames } from "../infra/matrix-env-vars.js";
+} from "../../extensions/matrix/runtime-api.js";
+export { getMatrixScopedEnvVarNames } from "../../extensions/matrix/runtime-api.js";
 export {
   requiresExplicitMatrixDefaultAccount,
   resolveMatrixDefaultOrOnlyAccountId,
-} from "../infra/matrix-account-selection.js";
+} from "../../extensions/matrix/runtime-api.js";
 export { maybeCreateMatrixMigrationSnapshot } from "../infra/matrix-migration-snapshot.js";
 export { getAgentScopedMediaLocalRoots } from "../media/local-roots.js";
 export { isPrivateOrLoopbackHost } from "../gateway/net.js";

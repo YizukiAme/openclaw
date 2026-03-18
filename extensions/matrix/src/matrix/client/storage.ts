@@ -1,15 +1,16 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { maybeCreateMatrixMigrationSnapshot, normalizeAccountId } from "openclaw/plugin-sdk/matrix";
 import {
-  maybeCreateMatrixMigrationSnapshot,
-  normalizeAccountId,
   requiresExplicitMatrixDefaultAccount,
-  resolveMatrixAccountStorageRoot,
   resolveMatrixDefaultOrOnlyAccountId,
-  resolveMatrixLegacyFlatStoragePaths,
-} from "openclaw/plugin-sdk/matrix";
+} from "../../account-selection.js";
 import { getMatrixRuntime } from "../../runtime.js";
+import {
+  resolveMatrixAccountStorageRoot,
+  resolveMatrixLegacyFlatStoragePaths,
+} from "../../storage-paths.js";
 import type { MatrixStoragePaths } from "./types.js";
 
 export const DEFAULT_ACCOUNT_KEY = "default";

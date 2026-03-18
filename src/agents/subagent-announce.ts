@@ -20,9 +20,9 @@ import { extractTextFromChatContent } from "../shared/chat-content.js";
 import {
   type DeliveryContext,
   deliveryContextFromSession,
-  formatConversationTarget,
   mergeDeliveryContext,
   normalizeDeliveryContext,
+  resolveConversationDeliveryTarget,
 } from "../utils/delivery-context.js";
 import {
   INTERNAL_MESSAGE_CHANNEL,
@@ -554,18 +554,21 @@ async function resolveSubagentCompletionOrigin(params: {
     failClosed: false,
   });
   if (route.mode === "bound" && route.binding) {
+    const boundTarget = resolveConversationDeliveryTarget({
+      channel: route.binding.conversation.channel,
+      conversationId: route.binding.conversation.conversationId,
+      parentConversationId: route.binding.conversation.parentConversationId,
+    });
     return mergeDeliveryContext(
       {
         channel: route.binding.conversation.channel,
         accountId: route.binding.conversation.accountId,
-        to: formatConversationTarget({
-          channel: route.binding.conversation.channel,
-          conversationId: route.binding.conversation.conversationId,
-        }),
+        to: boundTarget.to,
         threadId:
-          requesterOrigin?.threadId != null && requesterOrigin.threadId !== ""
+          boundTarget.threadId ??
+          (requesterOrigin?.threadId != null && requesterOrigin.threadId !== ""
             ? String(requesterOrigin.threadId)
-            : undefined,
+            : undefined),
       },
       requesterOrigin,
     );

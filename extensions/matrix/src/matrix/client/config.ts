@@ -1,13 +1,15 @@
 import {
   DEFAULT_ACCOUNT_ID,
-  getMatrixScopedEnvVarNames,
   isPrivateOrLoopbackHost,
   normalizeAccountId,
   normalizeOptionalAccountId,
   normalizeResolvedSecretInputString,
+} from "openclaw/plugin-sdk/matrix";
+import {
   requiresExplicitMatrixDefaultAccount,
   resolveMatrixDefaultOrOnlyAccountId,
-} from "openclaw/plugin-sdk/matrix";
+} from "../../account-selection.js";
+import { getMatrixScopedEnvVarNames } from "../../env-vars.js";
 import { getMatrixRuntime } from "../../runtime.js";
 import type { CoreConfig } from "../../types.js";
 import {
@@ -111,7 +113,48 @@ function resolveGlobalMatrixEnvConfig(env: NodeJS.ProcessEnv): MatrixEnvConfig {
   };
 }
 
-export { getMatrixScopedEnvVarNames } from "openclaw/plugin-sdk/matrix";
+export { getMatrixScopedEnvVarNames } from "../../env-vars.js";
+
+export function resolveMatrixEnvAuthReadiness(
+  accountId: string,
+  env: NodeJS.ProcessEnv = process.env,
+): {
+  ready: boolean;
+  homeserver?: string;
+  userId?: string;
+  sourceHint: string;
+  missingMessage: string;
+} {
+  const normalizedAccountId = normalizeAccountId(accountId);
+  const scoped = resolveScopedMatrixEnvConfig(normalizedAccountId, env);
+  const scopedReady = hasReadyMatrixEnvAuth(scoped);
+  if (normalizedAccountId !== DEFAULT_ACCOUNT_ID) {
+    const keys = getMatrixScopedEnvVarNames(normalizedAccountId);
+    return {
+      ready: scopedReady,
+      homeserver: scoped.homeserver || undefined,
+      userId: scoped.userId || undefined,
+      sourceHint: `${keys.homeserver} (+ auth vars)`,
+      missingMessage: `Set per-account env vars for "${normalizedAccountId}" (for example ${keys.homeserver} + ${keys.accessToken} or ${keys.userId} + ${keys.password}).`,
+    };
+  }
+
+  const defaultScoped = resolveScopedMatrixEnvConfig(DEFAULT_ACCOUNT_ID, env);
+  const global = resolveGlobalMatrixEnvConfig(env);
+  const defaultScopedReady = hasReadyMatrixEnvAuth(defaultScoped);
+  const globalReady = hasReadyMatrixEnvAuth(global);
+  const defaultKeys = getMatrixScopedEnvVarNames(DEFAULT_ACCOUNT_ID);
+  return {
+    ready: defaultScopedReady || globalReady,
+    homeserver: defaultScoped.homeserver || global.homeserver || undefined,
+    userId: defaultScoped.userId || global.userId || undefined,
+    sourceHint: "MATRIX_* or MATRIX_DEFAULT_*",
+    missingMessage:
+      `Set Matrix env vars for the default account ` +
+      `(for example MATRIX_HOMESERVER + MATRIX_ACCESS_TOKEN, MATRIX_USER_ID + MATRIX_PASSWORD, ` +
+      `or ${defaultKeys.homeserver} + ${defaultKeys.accessToken}).`,
+  };
+}
 
 export function resolveScopedMatrixEnvConfig(
   accountId: string,

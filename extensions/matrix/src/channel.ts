@@ -28,12 +28,7 @@ import {
   resolveMatrixAccount,
   type ResolvedMatrixAccount,
 } from "./matrix/accounts.js";
-import {
-  getMatrixScopedEnvVarNames,
-  hasReadyMatrixEnvAuth,
-  resolveMatrixAuth,
-  resolveScopedMatrixEnvConfig,
-} from "./matrix/client.js";
+import { resolveMatrixEnvAuthReadiness, resolveMatrixAuth } from "./matrix/client.js";
 import { updateMatrixAccountConfig } from "./matrix/config-update.js";
 import { resolveMatrixConfigFieldPath, resolveMatrixConfigPath } from "./matrix/config-update.js";
 import { normalizeMatrixAllowList, normalizeMatrixUserId } from "./matrix/monitor/allowlist.js";
@@ -382,13 +377,8 @@ export const matrixPlugin: ChannelPlugin<ResolvedMatrixAccount> = {
         return "Matrix avatar URL must be an mxc:// URI or an http(s) URL";
       }
       if (input.useEnv) {
-        const scopedEnv = resolveScopedMatrixEnvConfig(accountId, process.env);
-        const scopedReady = hasReadyMatrixEnvAuth(scopedEnv);
-        if (accountId !== DEFAULT_ACCOUNT_ID && !scopedReady) {
-          const keys = getMatrixScopedEnvVarNames(accountId);
-          return `Set per-account env vars for "${accountId}" (for example ${keys.homeserver} + ${keys.accessToken} or ${keys.userId} + ${keys.password}).`;
-        }
-        return null;
+        const envReadiness = resolveMatrixEnvAuthReadiness(accountId, process.env);
+        return envReadiness.ready ? null : envReadiness.missingMessage;
       }
       if (!input.homeserver?.trim()) {
         return "Matrix requires --homeserver";

@@ -4,9 +4,9 @@ import {
   addWildcardAllowFrom,
   formatDocsLink,
   mergeAllowFromEntries,
+  moveSingleAccountChannelSectionToDefaultAccount,
   normalizeAccountId,
   promptAccountId,
-  requiresExplicitMatrixDefaultAccount,
   type RuntimeEnv,
   type WizardPrompter,
 } from "openclaw/plugin-sdk/matrix";
@@ -15,6 +15,7 @@ import {
   type ChannelSetupDmPolicy,
   type ChannelSetupWizardAdapter,
 } from "openclaw/plugin-sdk/setup";
+import { requiresExplicitMatrixDefaultAccount } from "./account-selection.js";
 import { listMatrixDirectoryGroupsLive } from "./directory-live.js";
 import {
   listMatrixAccountIds,
@@ -22,12 +23,7 @@ import {
   resolveMatrixAccount,
   resolveMatrixAccountConfig,
 } from "./matrix/accounts.js";
-import {
-  getMatrixScopedEnvVarNames,
-  hasReadyMatrixEnvAuth,
-  resolveScopedMatrixEnvConfig,
-  validateMatrixHomeserverUrl,
-} from "./matrix/client.js";
+import { resolveMatrixEnvAuthReadiness, validateMatrixHomeserverUrl } from "./matrix/client.js";
 import {
   resolveMatrixConfigFieldPath,
   resolveMatrixConfigPath,
@@ -238,6 +234,12 @@ async function runMatrixConfigure(params: {
     if (enteredName !== accountId) {
       await params.prompter.note(`Account id will be "${accountId}".`, "Matrix account");
     }
+    if (accountId !== DEFAULT_ACCOUNT_ID) {
+      next = moveSingleAccountChannelSectionToDefaultAccount({
+        cfg: next,
+        channelKey: channel,
+      }) as CoreConfig;
+    }
     next = updateMatrixAccountConfig(next, accountId, { name: enteredName, enabled: true });
   } else {
     const override = params.accountOverrides?.[channel]?.trim();
@@ -261,27 +263,10 @@ async function runMatrixConfigure(params: {
     await noteMatrixAuthHelp(params.prompter);
   }
 
-  const scopedEnv = resolveScopedMatrixEnvConfig(accountId, process.env);
-  const defaultScopedEnv = resolveScopedMatrixEnvConfig(DEFAULT_ACCOUNT_ID, process.env);
-  const globalEnv = {
-    homeserver: process.env.MATRIX_HOMESERVER?.trim() ?? "",
-    userId: process.env.MATRIX_USER_ID?.trim() ?? "",
-    accessToken: process.env.MATRIX_ACCESS_TOKEN?.trim() || undefined,
-    password: process.env.MATRIX_PASSWORD?.trim() || undefined,
-  };
-  const scopedReady = hasReadyMatrixEnvAuth(scopedEnv);
-  const defaultScopedReady = hasReadyMatrixEnvAuth(defaultScopedEnv);
-  const globalReady = hasReadyMatrixEnvAuth(globalEnv);
-  const envReady =
-    scopedReady || (accountId === DEFAULT_ACCOUNT_ID && (defaultScopedReady || globalReady));
-  const envHomeserver =
-    scopedEnv.homeserver ||
-    (accountId === DEFAULT_ACCOUNT_ID
-      ? defaultScopedEnv.homeserver || globalEnv.homeserver
-      : undefined);
-  const envUserId =
-    scopedEnv.userId ||
-    (accountId === DEFAULT_ACCOUNT_ID ? defaultScopedEnv.userId || globalEnv.userId : undefined);
+  const envReadiness = resolveMatrixEnvAuthReadiness(accountId, process.env);
+  const envReady = envReadiness.ready;
+  const envHomeserver = envReadiness.homeserver;
+  const envUserId = envReadiness.userId;
 
   if (
     envReady &&
@@ -290,13 +275,8 @@ async function runMatrixConfigure(params: {
     !existing.accessToken &&
     !existing.password
   ) {
-    const scopedEnvNames = getMatrixScopedEnvVarNames(accountId);
-    const envSourceHint =
-      accountId === DEFAULT_ACCOUNT_ID
-        ? "MATRIX_* or MATRIX_DEFAULT_*"
-        : `${scopedEnvNames.homeserver} (+ auth vars)`;
     const useEnv = await params.prompter.confirm({
-      message: `Matrix env vars detected (${envSourceHint}). Use env values?`,
+      message: `Matrix env vars detected (${envReadiness.sourceHint}). Use env values?`,
       initialValue: true,
     });
     if (useEnv) {

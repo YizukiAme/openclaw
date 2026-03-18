@@ -217,4 +217,37 @@ describe("matrix setup post-write bootstrap", () => {
       }
     }
   });
+
+  it("rejects default useEnv setup when no Matrix auth env vars are available", () => {
+    const previousEnv = {
+      MATRIX_HOMESERVER: process.env.MATRIX_HOMESERVER,
+      MATRIX_USER_ID: process.env.MATRIX_USER_ID,
+      MATRIX_ACCESS_TOKEN: process.env.MATRIX_ACCESS_TOKEN,
+      MATRIX_PASSWORD: process.env.MATRIX_PASSWORD,
+      MATRIX_DEFAULT_HOMESERVER: process.env.MATRIX_DEFAULT_HOMESERVER,
+      MATRIX_DEFAULT_USER_ID: process.env.MATRIX_DEFAULT_USER_ID,
+      MATRIX_DEFAULT_ACCESS_TOKEN: process.env.MATRIX_DEFAULT_ACCESS_TOKEN,
+      MATRIX_DEFAULT_PASSWORD: process.env.MATRIX_DEFAULT_PASSWORD,
+    };
+    for (const key of Object.keys(previousEnv)) {
+      delete process.env[key];
+    }
+    try {
+      expect(
+        matrixPlugin.setup!.validateInput?.({
+          cfg: {} as CoreConfig,
+          accountId: "default",
+          input: { useEnv: true },
+        }),
+      ).toContain("Set Matrix env vars for the default account");
+    } finally {
+      for (const [key, value] of Object.entries(previousEnv)) {
+        if (value === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = value;
+        }
+      }
+    }
+  });
 });

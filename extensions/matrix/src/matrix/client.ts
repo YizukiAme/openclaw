@@ -1,8 +1,9 @@
 export type { MatrixAuth } from "./client/types.js";
 export { isBunRuntime } from "./client/runtime.js";
-export { getMatrixScopedEnvVarNames } from "openclaw/plugin-sdk/matrix";
+export { getMatrixScopedEnvVarNames } from "../env-vars.js";
 export {
   hasReadyMatrixEnvAuth,
+  resolveMatrixEnvAuthReadiness,
   resolveMatrixConfigForAccount,
   resolveScopedMatrixEnvConfig,
   resolveMatrixAuth,

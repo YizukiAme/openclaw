@@ -4,6 +4,7 @@ import {
   prepareScopedSetupConfig,
   type ChannelSetupAdapter,
 } from "openclaw/plugin-sdk/setup";
+import { resolveMatrixEnvAuthReadiness } from "./matrix/client.js";
 import type { CoreConfig } from "./types.js";
 
 const channel = "matrix" as const;
@@ -49,9 +50,10 @@ export const matrixSetupAdapter: ChannelSetupAdapter = {
       accountId,
       name,
     }) as CoreConfig,
-  validateInput: ({ input }) => {
+  validateInput: ({ accountId, input }) => {
     if (input.useEnv) {
-      return null;
+      const envReadiness = resolveMatrixEnvAuthReadiness(accountId, process.env);
+      return envReadiness.ready ? null : envReadiness.missingMessage;
     }
     if (!input.homeserver?.trim()) {
       return "Matrix requires --homeserver";

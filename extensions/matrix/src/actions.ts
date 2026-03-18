@@ -3,13 +3,13 @@ import {
   createActionGate,
   readNumberParam,
   readStringParam,
-  requiresExplicitMatrixDefaultAccount,
   type ChannelMessageActionAdapter,
   type ChannelMessageActionContext,
   type ChannelMessageActionName,
   type ChannelMessageToolDiscovery,
   type ChannelToolSend,
 } from "openclaw/plugin-sdk/matrix";
+import { requiresExplicitMatrixDefaultAccount } from "./account-selection.js";
 import { resolveDefaultMatrixAccountId, resolveMatrixAccount } from "./matrix/accounts.js";
 import type { CoreConfig } from "./types.js";
 

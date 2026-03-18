@@ -117,6 +117,85 @@ describe("matrix onboarding", () => {
     ).toBe(true);
   });
 
+  it("promotes legacy top-level Matrix config before adding a named account", async () => {
+    setMatrixRuntime({
+      state: {
+        resolveStateDir: (_env: NodeJS.ProcessEnv, homeDir?: () => string) =>
+          (homeDir ?? (() => "/tmp"))(),
+      },
+      config: {
+        loadConfig: () => ({}),
+      },
+    } as never);
+
+    const prompter = {
+      note: vi.fn(async () => {}),
+      select: vi.fn(async ({ message }: { message: string }) => {
+        if (message === "Matrix already configured. What do you want to do?") {
+          return "add-account";
+        }
+        if (message === "Matrix auth method") {
+          return "token";
+        }
+        throw new Error(`unexpected select prompt: ${message}`);
+      }),
+      text: vi.fn(async ({ message }: { message: string }) => {
+        if (message === "Matrix account name") {
+          return "ops";
+        }
+        if (message === "Matrix homeserver URL") {
+          return "https://matrix.ops.example.org";
+        }
+        if (message === "Matrix access token") {
+          return "ops-token";
+        }
+        if (message === "Matrix device name (optional)") {
+          return "";
+        }
+        throw new Error(`unexpected text prompt: ${message}`);
+      }),
+      confirm: vi.fn(async () => false),
+    } as unknown as WizardPrompter;
+
+    const result = await matrixOnboardingAdapter.configureInteractive!({
+      cfg: {
+        channels: {
+          matrix: {
+            homeserver: "https://matrix.main.example.org",
+            userId: "@main:example.org",
+            accessToken: "main-token",
+          },
+        },
+      } as CoreConfig,
+      runtime: { log: vi.fn(), error: vi.fn(), exit: vi.fn() } as unknown as RuntimeEnv,
+      prompter,
+      options: undefined,
+      accountOverrides: {},
+      shouldPromptAccountIds: true,
+      forceAllowFrom: false,
+      configured: true,
+      label: "Matrix",
+    });
+
+    expect(result).not.toBe("skip");
+    if (result === "skip") {
+      return;
+    }
+
+    expect(result.cfg.channels?.matrix?.homeserver).toBeUndefined();
+    expect(result.cfg.channels?.matrix?.accessToken).toBeUndefined();
+    expect(result.cfg.channels?.matrix?.accounts?.default).toMatchObject({
+      homeserver: "https://matrix.main.example.org",
+      userId: "@main:example.org",
+      accessToken: "main-token",
+    });
+    expect(result.cfg.channels?.matrix?.accounts?.ops).toMatchObject({
+      name: "ops",
+      homeserver: "https://matrix.ops.example.org",
+      accessToken: "ops-token",
+    });
+  });
+
   it("includes device env var names in auth help text", async () => {
     setMatrixRuntime({
       state: {

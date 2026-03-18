@@ -1,10 +1,13 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import {
+  resolveConfiguredMatrixAccountIds,
+  resolveMatrixLegacyFlatStoragePaths,
+} from "../../extensions/matrix/runtime-api.js";
 import type { OpenClawConfig } from "../config/config.js";
 import { resolveStateDir } from "../config/paths.js";
 import { writeJsonFileAtomically as writeJsonFileAtomicallyImpl } from "../plugin-sdk/json-store.js";
-import { resolveConfiguredMatrixAccountIds } from "./matrix-account-selection.js";
 import {
   resolveLegacyMatrixFlatStoreTarget,
   resolveMatrixMigrationAccountTarget,
@@ -15,7 +18,6 @@ import {
   loadMatrixLegacyCryptoInspector,
   type MatrixLegacyCryptoInspector,
 } from "./matrix-plugin-helper.js";
-import { resolveMatrixLegacyFlatStoragePaths } from "./matrix-storage-paths.js";
 
 type MatrixLegacyCryptoCounts = {
   total: number;
