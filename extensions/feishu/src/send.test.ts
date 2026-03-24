@@ -6,7 +6,6 @@ import {
   editMessageFeishu,
   getMessageFeishu,
   listFeishuThreadMessages,
-  parseTextWithMentions,
   resolveFeishuCardTemplate,
 } from "./send.js";
 
@@ -44,108 +43,28 @@ vi.mock("./runtime.js", () => ({
   }),
 }));
 
-describe("parseTextWithMentions", () => {
-  it("returns a single md element for plain text without mentions", () => {
-    const result = parseTextWithMentions("Hello world");
-    expect(result).toEqual([{ tag: "md", text: "Hello world" }]);
-  });
-
-  it("parses a single mention at the start", () => {
-    const result = parseTextWithMentions(
-      '<at user_id="ou_123">Alice</at> hello!',
-    );
-    expect(result).toEqual([
-      { tag: "at", user_id: "ou_123", user_name: "Alice" },
-      { tag: "md", text: " hello!" },
-    ]);
-  });
-
-  it("parses a single mention at the end", () => {
-    const result = parseTextWithMentions(
-      'hello <at user_id="ou_456">Bob</at>',
-    );
-    expect(result).toEqual([
-      { tag: "md", text: "hello " },
-      { tag: "at", user_id: "ou_456", user_name: "Bob" },
-    ]);
-  });
-
-  it("parses multiple mentions", () => {
-    const result = parseTextWithMentions(
-      '<at user_id="ou_1">Alice</at> <at user_id="ou_2">Bob</at> hi',
-    );
-    expect(result).toEqual([
-      { tag: "at", user_id: "ou_1", user_name: "Alice" },
-      { tag: "md", text: " " },
-      { tag: "at", user_id: "ou_2", user_name: "Bob" },
-      { tag: "md", text: " hi" },
-    ]);
-  });
-
-  it("handles @all mention", () => {
-    const result = parseTextWithMentions(
-      '<at user_id="all">Everyone</at> announcement',
-    );
-    expect(result).toEqual([
-      { tag: "at", user_id: "all", user_name: "Everyone" },
-      { tag: "md", text: " announcement" },
-    ]);
-  });
-
-  it("handles mention with empty display name", () => {
-    const result = parseTextWithMentions(
-      '<at user_id="ou_789"></at> test',
-    );
-    expect(result).toEqual([
-      { tag: "at", user_id: "ou_789" },
-      { tag: "md", text: " test" },
-    ]);
-  });
-
-  it("returns single md element for empty string", () => {
-    const result = parseTextWithMentions("");
-    expect(result).toEqual([{ tag: "md", text: "" }]);
-  });
-
-  it("is safe to call multiple times in sequence", () => {
-    const first = parseTextWithMentions('<at user_id="ou_1">A</at> x');
-    const second = parseTextWithMentions('<at user_id="ou_2">B</at> y');
-    expect(first).toEqual([
-      { tag: "at", user_id: "ou_1", user_name: "A" },
-      { tag: "md", text: " x" },
-    ]);
-    expect(second).toEqual([
-      { tag: "at", user_id: "ou_2", user_name: "B" },
-      { tag: "md", text: " y" },
-    ]);
-  });
-});
-
 describe("buildFeishuPostMessagePayload", () => {
   it("produces post payload with correct structure for plain text", () => {
     const result = buildFeishuPostMessagePayload({ messageText: "plain text" });
     expect(result.msgType).toBe("post");
     const parsed = JSON.parse(result.content);
-    expect(parsed.zh_cn.content).toEqual([
-      [{ tag: "md", text: "plain text" }],
-    ]);
+    expect(parsed.zh_cn.content).toEqual([[{ tag: "md", text: "plain text" }]]);
   });
 
-  it("does not parse at tags when hasMentions is not set", () => {
+  it("keeps literal at-tag text when mentions are not provided", () => {
     const result = buildFeishuPostMessagePayload({
       messageText: '<at user_id="ou_123">Alice</at> Hello!',
     });
     const parsed = JSON.parse(result.content);
-    // Without hasMentions, the <at> markup is kept as literal text in a single md element
     expect(parsed.zh_cn.content).toEqual([
       [{ tag: "md", text: '<at user_id="ou_123">Alice</at> Hello!' }],
     ]);
   });
 
-  it("splits mentions into native at elements when hasMentions is true", () => {
+  it("renders mention targets as native at elements", () => {
     const result = buildFeishuPostMessagePayload({
-      messageText: '<at user_id="ou_123">Alice</at> Hello!',
-      hasMentions: true,
+      messageText: "Hello!",
+      mentions: [{ openId: "ou_123", name: "Alice", key: "@_user_1" }],
     });
     const parsed = JSON.parse(result.content);
     expect(parsed.zh_cn.content).toEqual([
@@ -156,11 +75,13 @@ describe("buildFeishuPostMessagePayload", () => {
     ]);
   });
 
-  it("handles multiple mentions interleaved with text when hasMentions is true", () => {
+  it("renders multiple mentions before the body text", () => {
     const result = buildFeishuPostMessagePayload({
-      messageText:
-        '<at user_id="ou_1">Alice</at> <at user_id="ou_2">Bob</at> check this',
-      hasMentions: true,
+      messageText: "check this",
+      mentions: [
+        { openId: "ou_1", name: "Alice", key: "@_user_1" },
+        { openId: "ou_2", name: "Bob", key: "@_user_2" },
+      ],
     });
     const parsed = JSON.parse(result.content);
     expect(parsed.zh_cn.content).toEqual([
@@ -169,6 +90,44 @@ describe("buildFeishuPostMessagePayload", () => {
         { tag: "md", text: " " },
         { tag: "at", user_id: "ou_2", user_name: "Bob" },
         { tag: "md", text: " check this" },
+      ],
+    ]);
+  });
+
+  it("does not reinterpret literal at-tag text in the body when mentions exist", () => {
+    const result = buildFeishuPostMessagePayload({
+      messageText: 'syntax: <at user_id="all">Everyone</at>',
+      mentions: [{ openId: "ou_123", name: "Alice", key: "@_user_1" }],
+    });
+    const parsed = JSON.parse(result.content);
+    expect(parsed.zh_cn.content).toEqual([
+      [
+        { tag: "at", user_id: "ou_123", user_name: "Alice" },
+        { tag: "md", text: ' syntax: <at user_id="all">Everyone</at>' },
+      ],
+    ]);
+  });
+
+  it("treats mention display names as data instead of parser syntax", () => {
+    const result = buildFeishuPostMessagePayload({
+      messageText: "payload",
+      mentions: [
+        {
+          openId: "ou_123",
+          name: '</at><at user_id="all">Everyone</at>',
+          key: "@_user_1",
+        },
+      ],
+    });
+    const parsed = JSON.parse(result.content);
+    expect(parsed.zh_cn.content).toEqual([
+      [
+        {
+          tag: "at",
+          user_id: "ou_123",
+          user_name: '</at><at user_id="all">Everyone</at>',
+        },
+        { tag: "md", text: " payload" },
       ],
     ]);
   });

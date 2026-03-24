@@ -2,7 +2,7 @@ import type { ClawdbotConfig } from "../runtime-api.js";
 import { resolveFeishuRuntimeAccount } from "./accounts.js";
 import { createFeishuClient } from "./client.js";
 import type { MentionTarget } from "./mention.js";
-import { buildMentionedMessage, buildMentionedCardContent } from "./mention.js";
+import { buildMentionedCardContent } from "./mention.js";
 import { parsePostContent } from "./post.js";
 import { getFeishuRuntime } from "./runtime.js";
 import { assertFeishuMessageApiSuccess, toFeishuSendResult } from "./send-result.js";
@@ -418,49 +418,18 @@ export type SendFeishuMessageParams = {
   accountId?: string;
 };
 
-/**
- * Parse a message text string and split `<at user_id="...">name</at>` patterns
- * into native Feishu post `at` elements, leaving the surrounding text as `md`
- * elements. This ensures mentions render with the correct blue color in Feishu
- * instead of inheriting the bot's identity color.
- *
- * When no `<at>` patterns are found the function returns a single `md` element
- * identical to the previous behaviour.
- */
-export function parseTextWithMentions(
-  text: string,
-): Array<Record<string, string>> {
-  const AT_MENTION_RE = /<at\s+user_id="([^"]+)">(.*?)<\/at>/g;
-  const elements: Array<Record<string, string>> = [];
-  let lastIndex = 0;
+type FeishuPostElement =
+  | { tag: "md"; text: string }
+  | { tag: "at"; user_id: string; user_name?: string };
 
-  for (const match of text.matchAll(AT_MENTION_RE)) {
-    // Push any text before this match as an md element.
-    const before = text.slice(lastIndex, match.index);
-    if (before) {
-      elements.push({ tag: "md", text: before });
+function buildFeishuMentionElements(mentions: MentionTarget[]): FeishuPostElement[] {
+  const elements: FeishuPostElement[] = [];
+
+  for (const [index, mention] of mentions.entries()) {
+    elements.push({ tag: "at", user_id: mention.openId, user_name: mention.name || undefined });
+    if (index < mentions.length - 1) {
+      elements.push({ tag: "md", text: " " });
     }
-
-    const userId = match[1];
-    const userName = match[2];
-    const atElement: Record<string, string> = { tag: "at", user_id: userId };
-    if (userName) {
-      atElement.user_name = userName;
-    }
-    elements.push(atElement);
-
-    lastIndex = match.index! + match[0].length;
-  }
-
-  // Push any remaining text after the last match.
-  const remaining = text.slice(lastIndex);
-  if (remaining) {
-    elements.push({ tag: "md", text: remaining });
-  }
-
-  // If no mentions were found, return a single md element (original behaviour).
-  if (elements.length === 0) {
-    return [{ tag: "md", text }];
   }
 
   return elements;
@@ -468,18 +437,22 @@ export function parseTextWithMentions(
 
 export function buildFeishuPostMessagePayload(params: {
   messageText: string;
-  hasMentions?: boolean;
+  mentions?: MentionTarget[];
 }): {
   content: string;
   msgType: string;
 } {
-  const { messageText, hasMentions } = params;
-  // Only parse <at> tags when the caller explicitly indicates mentions are
-  // present.  This avoids accidentally converting quoted or example <at> markup
-  // in normal bot replies into live mention elements (see #49833 discussion).
-  const elements = hasMentions
-    ? parseTextWithMentions(messageText)
-    : [{ tag: "md", text: messageText }];
+  const { messageText, mentions } = params;
+  const elements: FeishuPostElement[] =
+    mentions != null && mentions.length > 0
+      ? [
+          ...buildFeishuMentionElements(mentions),
+          ...(messageText
+            ? [{ tag: "md", text: ` ${messageText}` } satisfies FeishuPostElement]
+            : []),
+        ]
+      : [{ tag: "md", text: messageText }];
+
   return {
     content: JSON.stringify({
       zh_cn: {
@@ -501,15 +474,8 @@ export async function sendMessageFeishu(
   });
 
   // Build message content (with @mention support)
-  let rawText = text ?? "";
-  const hasMentions = mentions != null && mentions.length > 0;
-  if (hasMentions) {
-    rawText = buildMentionedMessage(mentions, rawText);
-  }
-
-  const messageText = getFeishuRuntime().channel.text.convertMarkdownTables(rawText, tableMode);
-
-  const { content, msgType } = buildFeishuPostMessagePayload({ messageText, hasMentions });
+  const messageText = getFeishuRuntime().channel.text.convertMarkdownTables(text ?? "", tableMode);
+  const { content, msgType } = buildFeishuPostMessagePayload({ messageText, mentions });
 
   const directParams = { receiveId, receiveIdType, content, msgType };
   return sendReplyOrFallbackDirect(client, {
